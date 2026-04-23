@@ -36,9 +36,9 @@ jobs:
         working-directory: jarvis
         run: flutter pub get
 
-      - name: Build debug APK
+      - name: Build debug APK (verbose to find v1 embedding culprits)
         working-directory: jarvis
-        run: flutter build apk --debug
+        run: flutter build apk --debug -v 2>&1 | tail -200
 
       - name: Build release APK (split per ABI)
         working-directory: jarvis

@@ -57,7 +57,7 @@ dependencies:
   flutter_phone_direct_caller: ^2.1.1
   share_plus: ^7.2.2
   flutter_contacts: ^1.1.7+1
-  flutter_sms: ^2.3.3
+  flutter_sms: ^3.0.1
   call_log: ^4.0.0
   
   # ===== Telegram =====
@@ -75,14 +75,13 @@ dependencies:
   android_intent_plus: ^5.0.2
   math_expressions: ^2.4.0
   uuid: ^4.3.3
-  device_apps: ^2.2.0
   system_settings: ^2.1.0
   
   # ===== Media =====
   audioplayers: ^6.0.0
   image_picker: ^1.0.7
   video_player: ^2.8.3
-  gallery_saver: ^2.3.2
+  saver_gallery: ^4.1.1
   flutter_image_compress: ^2.1.0
   
   # ===== Location =====
@@ -99,7 +98,7 @@ dependencies:
   
   # ===== File Management =====
   file_picker: ^8.0.0
-  flutter_native_timezone: ^2.0.0
+  flutter_timezone: ^4.1.1
   archive: ^3.4.10
   
   # ===== UI Helpers =====

@@ -60,7 +60,7 @@ dependencies:
   call_log: ^4.0.0
   
   # ===== Telegram =====
-  teledart: ^1.0.2
+  teledart: ^0.6.1
   
   # ===== Storage & Database =====
   shared_preferences: ^2.2.3
@@ -75,7 +75,7 @@ dependencies:
   math_expressions: ^2.4.0
   uuid: ^4.3.3
   device_apps: ^2.2.0
-  system_settings: ^2.1.1
+  system_settings: ^2.1.0
   
   # ===== Media =====
   audioplayers: ^6.0.0

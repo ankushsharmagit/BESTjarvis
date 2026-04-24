@@ -50,35 +50,39 @@ jobs:
         run: flutter pub get
 
       - name: Patch missing namespace in old plugins (AGP 8 fix)
+        shell: bash
         run: |
           echo "=== Auto-injecting android.namespace into legacy plugin build.gradle files ==="
           PUBCACHE="${PUB_CACHE:-$HOME/.pub-cache}"
-          for gradle_file in $(find "$PUBCACHE/hosted" -path "*/android/build.gradle" 2>/dev/null); do
+          PATCHED=0
+          while IFS= read -r gradle_file; do
             PLUGIN_DIR=$(echo "$gradle_file" | sed -E 's|(.*/hosted/[^/]+/[^/]+)/.*|\1|')
             PLUGIN_NAME=$(basename "$PLUGIN_DIR" | sed 's/-[0-9].*//')
             MANIFEST="$PLUGIN_DIR/android/src/main/AndroidManifest.xml"
-            # Skip if namespace already set
-            if grep -qE "^\s*namespace\s+['\"]" "$gradle_file"; then continue; fi
-            # Try to read package="..." from AndroidManifest
+            if grep -qE "^[[:space:]]*namespace[[:space:]]+['\"]" "$gradle_file"; then
+              continue
+            fi
+            PKG=""
             if [ -f "$MANIFEST" ]; then
               PKG=$(grep -oE 'package="[^"]+"' "$MANIFEST" | head -1 | sed 's/package="//;s/"//')
             fi
-            # Fallback to a generated namespace
             if [ -z "$PKG" ]; then
-              PKG="com.example.$(echo $PLUGIN_NAME | tr -d '_')"
+              CLEAN=$(echo "$PLUGIN_NAME" | tr -d '_-')
+              PKG="com.example.${CLEAN}"
             fi
-            echo "🔧 Patching $PLUGIN_NAME with namespace=$PKG"
-            # Inject namespace inside android { ... } block
-            python3 -c "
-import re,sys
-p='$gradle_file'
-s=open(p).read()
-if re.search(r'namespace\s+[\"\\']', s): sys.exit(0)
-s2=re.sub(r'(android\s*\{)', r'\\1\n    namespace \"$PKG\"', s, count=1)
-open(p,'w').write(s2)
-"
-          done
-          echo "=== Done patching ==="
+            echo "Patching ${PLUGIN_NAME} with namespace=${PKG}"
+            awk -v ns="$PKG" '
+              !done && /android[[:space:]]*\{/ {
+                print
+                print "    namespace \"" ns "\""
+                done=1
+                next
+              }
+              { print }
+            ' "$gradle_file" > "${gradle_file}.new" && mv "${gradle_file}.new" "$gradle_file"
+            PATCHED=$((PATCHED+1))
+          done < <(find "$PUBCACHE/hosted" -path "*/android/build.gradle" 2>/dev/null)
+          echo "=== Done. Patched $PATCHED plugin(s) ==="
 
       - name: Find plugins still using Android v1 embedding
         working-directory: jarvis

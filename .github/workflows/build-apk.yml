@@ -52,25 +52,34 @@ jobs:
       - name: Patch missing namespace in old plugins (AGP 8 fix)
         shell: bash
         run: |
+          set +e
           echo "=== Auto-injecting android.namespace into legacy plugin build.gradle files ==="
           PUBCACHE="${PUB_CACHE:-$HOME/.pub-cache}"
           PATCHED=0
-          while IFS= read -r gradle_file; do
+          SKIPPED=0
+          # Only top-level plugin android/build.gradle (skip example/, test/, nested)
+          FILES=$(find "$PUBCACHE/hosted" -type f -path "*/android/build.gradle" \
+            ! -path "*/example/*" ! -path "*/test/*" ! -path "*/.dart_tool/*" 2>/dev/null | sort -u)
+          for gradle_file in $FILES; do
+            [ -f "$gradle_file" ] || continue
             PLUGIN_DIR=$(echo "$gradle_file" | sed -E 's|(.*/hosted/[^/]+/[^/]+)/.*|\1|')
             PLUGIN_NAME=$(basename "$PLUGIN_DIR" | sed 's/-[0-9].*//')
             MANIFEST="$PLUGIN_DIR/android/src/main/AndroidManifest.xml"
-            if grep -qE "^[[:space:]]*namespace[[:space:]]+['\"]" "$gradle_file"; then
+            # Skip if already has namespace
+            grep -qE "namespace[[:space:]]+['\"]" "$gradle_file" 2>/dev/null
+            if [ $? -eq 0 ]; then
+              SKIPPED=$((SKIPPED+1))
               continue
             fi
             PKG=""
             if [ -f "$MANIFEST" ]; then
-              PKG=$(grep -oE 'package="[^"]+"' "$MANIFEST" | head -1 | sed 's/package="//;s/"//')
+              PKG=$(grep -oE 'package="[^"]+"' "$MANIFEST" 2>/dev/null | head -1 | sed 's/package="//;s/"//')
             fi
             if [ -z "$PKG" ]; then
               CLEAN=$(echo "$PLUGIN_NAME" | tr -d '_-')
               PKG="com.example.${CLEAN}"
             fi
-            echo "Patching ${PLUGIN_NAME} with namespace=${PKG}"
+            echo "Patching ${PLUGIN_NAME} -> namespace=${PKG}"
             awk -v ns="$PKG" '
               !done && /android[[:space:]]*\{/ {
                 print
@@ -79,10 +88,17 @@ jobs:
                 next
               }
               { print }
-            ' "$gradle_file" > "${gradle_file}.new" && mv "${gradle_file}.new" "$gradle_file"
-            PATCHED=$((PATCHED+1))
-          done < <(find "$PUBCACHE/hosted" -path "*/android/build.gradle" 2>/dev/null)
-          echo "=== Done. Patched $PATCHED plugin(s) ==="
+            ' "$gradle_file" > "${gradle_file}.new"
+            if [ -s "${gradle_file}.new" ]; then
+              mv "${gradle_file}.new" "$gradle_file"
+              PATCHED=$((PATCHED+1))
+            else
+              rm -f "${gradle_file}.new"
+              echo "  (skipped - awk produced empty output)"
+            fi
+          done
+          echo "=== Done. Patched: $PATCHED, Already-OK: $SKIPPED ==="
+          exit 0
 
       - name: Find plugins still using Android v1 embedding
         working-directory: jarvis

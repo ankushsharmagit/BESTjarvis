@@ -38,15 +38,22 @@ jobs:
       - name: Find plugins still using Android v1 embedding
         working-directory: jarvis
         run: |
-          echo "=== Scanning all plugin AndroidManifest.xml files for v1 embedding ==="
+          echo "=== Scanning plugin pubspec.yaml for v1 embedding format ==="
           PUBCACHE="${PUB_CACHE:-$HOME/.pub-cache}"
           BAD=0
-          for manifest in $(find "$PUBCACHE/hosted" -path "*/android/src/main/AndroidManifest.xml" 2>/dev/null); do
-            if ! grep -q "flutterEmbedding" "$manifest" 2>/dev/null && ! grep -q "io.flutter.embedding" "$manifest" 2>/dev/null; then
-              PLUGIN=$(echo "$manifest" | sed -E 's|.*/hosted/[^/]+/([^/]+)/.*|\1|')
-              echo "❌ V1-ONLY plugin: $PLUGIN"
-              echo "   manifest: $manifest"
-              BAD=1
+          for spec in $(find "$PUBCACHE/hosted" -maxdepth 4 -name "pubspec.yaml" 2>/dev/null); do
+            PLUGIN=$(echo "$spec" | sed -E 's|.*/hosted/[^/]+/([^/]+)/.*|\1|')
+            # Only consider real plugins (have android section / plugin block)
+            if grep -qE "^\s*plugin\s*:" "$spec" 2>/dev/null; then
+              # Check if plugin block uses legacy flat format (no platforms:)
+              if ! awk '/^\s*plugin\s*:/{flag=1;next} /^[a-zA-Z]/{flag=0} flag && /platforms\s*:/{found=1} END{exit !found}' "$spec"; then
+                # Has plugin block but no platforms: → v1 only
+                if grep -qE "androidPackage\s*:" "$spec" 2>/dev/null; then
+                  echo "❌ V1-ONLY plugin: $PLUGIN"
+                  echo "   pubspec: $spec"
+                  BAD=1
+                fi
+              fi
             fi
           done
           if [ "$BAD" = "0" ]; then echo "✅ No v1-only plugins detected"; fi

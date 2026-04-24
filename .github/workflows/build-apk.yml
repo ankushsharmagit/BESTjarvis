@@ -35,17 +35,43 @@ jobs:
         working-directory: jarvis
         run: flutter pub get
 
-      - name: Build debug APK (verbose to find v1 embedding culprits)
+      - name: Find plugins still using Android v1 embedding
         working-directory: jarvis
-        run: flutter build apk --debug -v 2>&1 | tail -200
+        run: |
+          echo "=== Scanning all plugin AndroidManifest.xml files for v1 embedding ==="
+          PUBCACHE="${PUB_CACHE:-$HOME/.pub-cache}"
+          BAD=0
+          for manifest in $(find "$PUBCACHE/hosted" -path "*/android/src/main/AndroidManifest.xml" 2>/dev/null); do
+            if ! grep -q "flutterEmbedding" "$manifest" 2>/dev/null && ! grep -q "io.flutter.embedding" "$manifest" 2>/dev/null; then
+              PLUGIN=$(echo "$manifest" | sed -E 's|.*/hosted/[^/]+/([^/]+)/.*|\1|')
+              echo "❌ V1-ONLY plugin: $PLUGIN"
+              echo "   manifest: $manifest"
+              BAD=1
+            fi
+          done
+          if [ "$BAD" = "0" ]; then echo "✅ No v1-only plugins detected"; fi
+
+      - name: Build debug APK
+        working-directory: jarvis
+        run: flutter build apk --debug 2>&1 | tee debug-build.log
 
       - name: Build release APK (split per ABI)
+        if: success()
         working-directory: jarvis
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi 2>&1 | tee release-build.log
 
       - name: Build universal release APK
+        if: success()
         working-directory: jarvis
-        run: flutter build apk --release
+        run: flutter build apk --release 2>&1 | tee universal-build.log
+
+      - name: Upload build logs (always, even on failure)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: jarvis/*.log
+          if-no-files-found: ignore
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

@@ -31,6 +31,20 @@ jobs:
       - name: Show Flutter version
         run: flutter --version
 
+      - name: Regenerate missing Android project files
+        working-directory: jarvis
+        run: |
+          echo "=== Backing up existing AndroidManifest.xml ==="
+          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml.bak
+          echo "=== Running flutter create to regenerate android/ scaffolding ==="
+          flutter create --platforms=android --org com.ankushsharma --project-name jarvis_app .
+          echo "=== Restoring your custom AndroidManifest.xml ==="
+          cp /tmp/AndroidManifest.xml.bak android/app/src/main/AndroidManifest.xml
+          echo "=== Files now in android/app/src/main: ==="
+          ls -la android/app/src/main/
+          echo "=== MainActivity location: ==="
+          find android/app/src/main -name "MainActivity*" || echo "NOT FOUND"
+
       - name: Install dependencies
         working-directory: jarvis
         run: flutter pub get
